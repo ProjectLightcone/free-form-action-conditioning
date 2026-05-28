@@ -159,7 +159,7 @@ export const actionConditioningNoteDiagram: DiagramDefinition = {
 	subtitle:
 		'The experiment compares explicit condition factorization against a context-stuffed JEPA baseline.',
 	caption:
-		'Figure 1. The central question is whether an explicit condition path can preserve JEPA-style predictive structure while making actions, queries, and counterfactuals reusable across many context evaluations.',
+		'Figure 1. The central question is whether context and condition can both be flexible encoders while still producing quality JEPA-style predictions. Follow-up questions ask how the architecture should combine them, and whether factoring condition from context improves reuse, diagnostics, or counterfactual evaluation enough to justify the tradeoffs.',
 	rankdir: 'TB',
 	nodesep: 38,
 	ranksep: 54,

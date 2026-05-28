@@ -3,9 +3,9 @@ import GeneratedDiagram from '../components/GeneratedDiagram.astro';
 import Layout from '../layouts/Layout.astro';
 import { actionConditioningNoteDiagram } from '../data/diagrams';
 
-const title = 'Action-Conditioned JEPA World Models';
+const title = 'Free-Form Action Conditioning for JEPA World Models';
 const description =
-	'A concise technical note on flexible action conditioning, TEPA, context-memory TEPA, and a context-stuffed JEPA baseline.';
+	'A concise technical note on whether LeWorldModel-style action conditioning can become a flexible condition interface for general-purpose prediction and perception.';
 
 const results = [
 	{
@@ -91,27 +91,26 @@ const renderValue = (value: string, key: string, best: string) =>
 		<nav class="topbar" aria-label="Primary">
 			<a href="#results">Results</a>
 			<a href="#analysis">Analysis</a>
-			<a href="/tepa">Full TEPA whitepaper</a>
 		</nav>
 		<div class="hero-inner">
 			<p class="kicker">Technical note | May 28, 2026</p>
-			<h1>Flexible action conditioning for JEPA-style world models</h1>
+			<h1>Free-form action conditioning for JEPA-style world models</h1>
 			<p class="standfirst">
-				A small empirical note on whether action-conditioned latent prediction can support
-				flexible condition surfaces: structured records now, text and richer interventions later.
+				A small empirical note on whether the action term in models like LeWorldModel can
+				become a flexible condition encoder for general-purpose prediction and perception.
 			</p>
 			<div class="summary-grid" aria-label="Summary">
 				<div>
-					<span>Question</span>
-					<p>Can we separate world state from condition while keeping predictive quality?</p>
+					<span>Motivation</span>
+					<p>General-purpose prediction models need instructions, not only typed action vectors.</p>
 				</div>
 				<div>
-					<span>Current result</span>
-					<p>Context-memory TEPA is strongest overall, but the JEPA baseline remains competitive.</p>
+					<span>First question</span>
+					<p>Can context and condition both be flexible encoders and still predict good targets?</p>
 				</div>
 				<div>
-					<span>Claim status</span>
-					<p>Promising pilot evidence, not a proof of architectural superiority.</p>
+					<span>Current answer</span>
+					<p>Yes in a toy setting, but architectural superiority is not yet established.</p>
 				</div>
 			</div>
 		</div>
@@ -121,6 +120,7 @@ const renderValue = (value: string, key: string, best: string) =>
 		<aside class="toc" aria-label="Contents">
 			<p>Contents</p>
 			<a href="#abstract">Abstract</a>
+			<a href="#motivation">Motivation</a>
 			<a href="#setup">Setup</a>
 			<a href="#models">Models</a>
 			<a href="#results">Results</a>
@@ -133,19 +133,50 @@ const renderValue = (value: string, key: string, best: string) =>
 			<section id="abstract" class="lede">
 				<h2>Abstract</h2>
 				<p>
-					Recent LeJEPA identifiability work argues that learning the right latent space is a
-					central requirement for world modeling, and that action conditioning is a natural next
-					theoretical step. This note explores the empirical companion question: if the action or
-					condition is not a fixed typed vector, can a JEPA-style predictive model still learn a
-					useful outcome space?
+					This project was inspired by LeWorldModel's use of an explicit action term. That
+					choice gives the model a powerful handle for action-conditioned prediction, but it also
+					keeps the interface grounded in a domain-specific action space. The question here is
+					whether that action term can be generalized into a flexible, free-form condition input.
+					If a world model is meant to support general-purpose prediction and perception, its
+					input interface has to span structured actions, natural language, transformations,
+					goals, horizons, and other condition surfaces. The model sees context, receives a
+					condition, and predicts what follows.
 				</p>
 				<p>
 					The experiment uses a deterministic 2D puck-world benchmark. A rendered scene is paired
 					with a condition describing an intervention, and the model predicts a latent target for
-					the resulting rollout. I compare standard TEPA, context-memory TEPA, a context-stuffed
-					JEPA baseline, and a fine-tuned condition-encoder variant. The main result is not that
-					factorization wins outright. It is that explicit condition factorization can stay
-					competitive while creating a cleaner interface for amortized counterfactual prediction.
+					the resulting rollout. The comparison includes standard Tri-Embedding Predictive
+					Architecture (TEPA), context-memory TEPA, a context-stuffed JEPA baseline, and a fine-tuned
+					condition-encoder variant. The result is evidence of capability, not proof of
+					architectural superiority: flexible condition encoders can produce quality
+					JEPA-style predictions in this setting, and the next question is how to organize the
+					architecture.
+				</p>
+			</section>
+
+			<section id="motivation">
+				<h2>Motivation</h2>
+				<p>
+					LeWorldModel is close to the desired shape of a general-purpose prediction model: it
+					conditions latent world prediction on an action. The missing piece is flexibility. A
+					domain-specific action vector is appropriate for a control benchmark, but a foundation
+					world model should accept many ways of specifying what to predict.
+				</p>
+				<p>
+					The basic interface should look familiar from LLM prompting, but the native output is a
+					predicted latent consequence rather than text. The context says what is present. The
+					condition says what action, transformation, query, horizon, or goal should matter. The
+					target latent can then support downstream decoders, probes, retrieval, planning, or task
+					specific heads.
+				</p>
+				<p>
+					The hypothesis is that the condition can be represented by an embedding module. That
+					embedding should carry the information needed to apply the requested transformation to
+					the context. TEPA is the proposed architectural answer explored here: keep context,
+					condition, and target as distinct embeddings, then test whether that factorization
+					preserves prediction quality while improving flexibility, reuse, and diagnostics. The
+					name is meant to acknowledge the JEPA lineage while marking the extra condition term
+					as the object of study.
 				</p>
 			</section>
 
@@ -153,14 +184,61 @@ const renderValue = (value: string, key: string, best: string) =>
 				<h2>Setup</h2>
 				<GeneratedDiagram diagram={actionConditioningNoteDiagram} />
 				<p>
-					The working formulation is simple: encode a context, encode a condition, predict the
-					latent outcome. The condition can be a structured intervention today and, eventually,
-					natural language, demonstrations, goals, horizons, or other query surfaces.
+					The first question is whether both the context and the condition can be treated as
+					flexible encoders while still producing quality JEPA-style target predictions. The
+					follow-up questions are architectural: how should the model combine them, and do the
+					benefits of factoring the condition out of the context outweigh the costs?
 				</p>
-				<pre><code>z_context = E_context(x)
-z_condition = E_condition(c)
-z_hat_target = P(z_context, z_condition)</code></pre>
+				<div class="pseudocode-set" aria-label="Architecture pseudocode">
+					<div class="pseudo-block">
+						<h3>Standard TEPA</h3>
+						<pre><code>z_context = E_context(x)  # cache once
+
+for c in C:
+  z_condition = E_condition(c)
+  z_hat_target[c] = P(z_context, z_condition)</code></pre>
+					</div>
+					<div class="pseudo-block">
+						<h3>Context-Memory TEPA</h3>
+						<pre><code>M_context = E_context_memory(x)  # cache once
+
+for c in C:
+  z_condition = E_condition(c)
+  z_readout = CrossAttention(
+    query = z_condition,
+    keys = M_context,
+    values = M_context
+  )
+  z_hat_target[c] = P(z_condition, z_readout)</code></pre>
+					</div>
+					<div class="pseudo-block">
+						<h3>Context-Stuffed JEPA</h3>
+						<pre><code>for c in C:
+  joint_input = Pack(x, c)
+  z_joint = E_joint(joint_input)
+  z_hat_target[c] = P(z_joint)</code></pre>
+					</div>
+				</div>
+				<p class="shared-objective">
+					In this benchmark, all three architectures predict the same target representation. The
+					current runs use SIGReg during target autoencoder pretraining, then freeze that target
+					path for predictor training:
+				</p>
+				<pre class="compact-code"><code>z_target = E_target(y_c)
+loss_target =
+  recon(D_target(z_target), y_c)
+  + lambda_sig * SIGReg(z_target)
+
+loss_predict =
+  d(z_hat_target, stopgrad(z_target))</code></pre>
 				<p>
+					For unfrozen or end-to-end variants, the same SIGReg pressure can remain in the
+					predictor objective when the target path is trainable; it is an anti-collapse pressure
+					on the latent space, not a difference between the three architecture diagrams above.
+				</p>
+				<p>
+					The condition is a structured intervention in the current benchmark and can later expand
+					to natural language, demonstrations, goals, horizons, or other query surfaces.
 					The target side is intentionally explicit. The training target is not raw prose. It is a
 					conditioned outcome bundle produced by the simulator, encoded by a separately pretrained
 					target encoder. That gives the predictor a stable latent target instead of asking it to
@@ -185,17 +263,18 @@ z_hat_target = P(z_context, z_condition)</code></pre>
 					<section>
 						<h3>Standard TEPA</h3>
 						<p>
-							A factorized model with separate context and condition encoders. The predictor
-							receives one context vector and one condition vector, then predicts the target
-							latent.
+							The proposed tri-embedding architecture in its simplest form: separate context,
+							condition, and target embeddings with a predictor between them. It can encode the
+							context once, cache one compact context vector, and apply a variable number of
+							conditions against that vector.
 						</p>
 					</section>
 					<section>
 						<h3>Context-Memory TEPA</h3>
 						<p>
-							A factorized model that keeps reusable context memory tokens and lets the condition
-							read from that memory through cross-attention. This keeps the condition interface
-							explicit while giving the model early interaction between condition and scene.
+							A factorized model that replaces the single-vector context cache with reusable
+							context memory tokens. The condition reads from that memory through cross-attention,
+							so condition-specific details can be selected after the condition is known.
 						</p>
 					</section>
 					<section>
@@ -271,28 +350,36 @@ z_hat_target = P(z_context, z_condition)</code></pre>
 
 			<section id="analysis">
 				<h2>Analysis</h2>
+				<h3>Can flexible condition encoders produce quality JEPA-style predictions?</h3>
 				<p>
-					The most important finding is close performance, not a blowout. The context-stuffed
-					JEPA baseline remains a serious comparator, especially because its joint encoder is
-					trainable end to end on the exact task. That may explain why it performs so well: the
-					encoder can learn a task-specific interaction between scene and condition rather than
-					reusing a pretrained condition representation.
+					The current answer is yes, within the limits of this structured-only puck-world
+					benchmark. Standard TEPA, context-memory TEPA, and the context-stuffed JEPA baseline all
+					learn to predict the same SIGReg-shaped target space. That supports the first premise:
+					an action-like condition does not have to be a fixed typed vector to participate in a
+					JEPA-style prediction objective. It does not yet prove generality across natural
+					language, mixed formats, or many domains.
 				</p>
+				<h3>How should the architecture handle the condition?</h3>
 				<p>
-					Context-memory TEPA looks like the best current compromise. It keeps reusable context
-					memory, preserves a separate condition path, and improves most target/probe metrics.
-					Fine-tuning the condition encoder improves in-domain validation and identifiability
-					probes, but the frozen context-memory model still has slightly better counterfactual
-					target and final-position MSE. That suggests condition adaptation helps, but may also
-					overfit the benchmark distribution unless the training curriculum is broadened.
+					The results point toward interaction capacity as the main design pressure. Standard
+					TEPA is the cleanest factorization, but its single context vector can become a bottleneck.
+					Context-memory TEPA keeps the condition path separate while letting the condition read
+					from richer cached context memory, and it is the strongest current factorized model.
+					Fine-tuning the condition encoder improves in-domain validation and latent probe scores,
+					but does not uniformly improve counterfactual target error, so condition adaptation
+					should be treated as useful but not settled.
 				</p>
+				<h3>Do the benefits of factoring condition from context outweigh the costs?</h3>
 				<p>
-					The architectural premise is therefore not moot. The case for TEPA is less "higher
-					accuracy on every metric" and more "competitive accuracy with a reusable condition
-					interface." If one scene must be evaluated against many actions, questions, or goals,
-					the factorized architecture can cache context and run cheaper counterfactual sweeps. If
-					the task only needs one condition per context and maximal early fusion, a context-stuffed
-					JEPA is a very reasonable design.
+					Not proven yet. The performance is close enough that the claim should not be
+					"TEPA is more accurate." The stronger claim is narrower: TEPA-style factorization can
+					preserve competitive prediction quality while offering a reusable condition interface,
+					context caching, and cleaner diagnostics. The context-stuffed JEPA baseline remains a
+					strong alternative because its joint encoder can specialize to the task and perform
+					early context-condition interaction. If a workload needs one condition per context,
+					context stuffing may be the simpler choice. If a workload needs many actions, queries,
+					or counterfactuals over the same context, factorized TEPA variants become more
+					attractive.
 				</p>
 			</section>
 
@@ -323,8 +410,9 @@ z_hat_target = P(z_context, z_condition)</code></pre>
 					<div>
 						<h3>Amortized counterfactual sweeps</h3>
 						<p>
-							Encode one context once, evaluate many conditions, and compare quality, latency,
-							and memory against the context-stuffed JEPA baseline.
+							Encode one context once, evaluate many conditions, and compare the standard TEPA
+							vector cache, the context-memory cache, and the context-stuffed JEPA baseline on
+							quality, latency, and memory.
 						</p>
 					</div>
 				</div>
@@ -350,8 +438,9 @@ z_hat_target = P(z_context, z_condition)</code></pre>
 						<a href="https://arxiv.org/abs/2511.08544">arXiv:2511.08544</a>.
 					</li>
 					<li>
-						Full TEPA whitepaper draft:
-						<a href="/tepa">Tri-Embedding Predictive Architecture</a>.
+						Assran, M. et al. (2023). Self-Supervised Learning from Images with a
+						Joint-Embedding Predictive Architecture.
+						<a href="https://arxiv.org/abs/2301.08243">arXiv:2301.08243</a>.
 					</li>
 				</ol>
 			</section>
@@ -577,6 +666,45 @@ z_hat_target = P(z_context, z_condition)</code></pre>
 		color: oklch(93% 0.012 235);
 		font-size: 0.95rem;
 		line-height: 1.65;
+	}
+
+	.pseudocode-set {
+		display: grid;
+		gap: 0.9rem;
+		margin: 1.5rem 0;
+	}
+
+	.pseudo-block {
+		border: 1px solid oklch(81% 0.022 230);
+		border-radius: 8px;
+		overflow: hidden;
+		background: oklch(19% 0.025 246);
+	}
+
+	.pseudo-block h3 {
+		margin: 0;
+		padding: 0.72rem 1rem;
+		border-bottom: 1px solid oklch(33% 0.032 246);
+		background: oklch(24% 0.03 246);
+		color: oklch(91% 0.014 228);
+		font-size: 0.78rem;
+		font-weight: 820;
+		letter-spacing: 0.07em;
+		text-transform: uppercase;
+	}
+
+	.pseudo-block pre {
+		margin: 0;
+		border: 0;
+		border-radius: 0;
+	}
+
+	.shared-objective {
+		margin-top: 1.6rem;
+	}
+
+	.compact-code {
+		margin-top: 0.8rem;
 	}
 
 	.sample-panel {
