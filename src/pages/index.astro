@@ -84,6 +84,9 @@ const results = [
 
 const renderValue = (value: string, key: string, best: string) =>
 	key === best ? `<strong>${value}</strong>` : value;
+
+const baseUrl = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const samplePanelPath = `${baseUrl}figures/context-memory-tepa-seed17-sample-panel.png`;
 ---
 
 <Layout title={title} description={description}>
@@ -246,7 +249,7 @@ loss_predict =
 				</p>
 				<figure class="sample-panel">
 					<img
-						src="/figures/context-memory-tepa-seed17-sample-panel.png"
+						src={samplePanelPath}
 						alt="Puck-world qualitative prediction panel with context, decoded target, and prediction views."
 						loading="lazy"
 					/>

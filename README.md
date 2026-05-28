@@ -47,6 +47,27 @@ npm run build
 
 The Astro site builds as a static site under `dist/`.
 
+## GitHub Pages Deployment
+
+This repo includes a GitHub Actions workflow at `.github/workflows/deploy.yml`.
+
+After pushing to a public GitHub repo:
+
+1. Open the repository settings on GitHub.
+2. Go to **Pages**.
+3. Set **Build and deployment** to **GitHub Actions**.
+4. Push to `main`.
+
+The workflow builds the Astro site and deploys `dist/` to GitHub Pages.
+
+For a project repo such as `free-form-action-conditioning`, the site URL will be:
+
+```text
+https://<username>.github.io/free-form-action-conditioning/
+```
+
+For a user-site repo named `<username>.github.io`, the workflow automatically uses `/` as the base path.
+
 ## Experiment Commands
 
 Run from `experiments/puck_world/`:
