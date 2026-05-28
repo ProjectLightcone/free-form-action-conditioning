@@ -87,6 +87,7 @@ const renderValue = (value: string, key: string, best: string) =>
 
 const baseUrl = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 const samplePanelPath = `${baseUrl}figures/context-memory-tepa-seed17-sample-panel.png`;
+const repoUrl = 'https://github.com/ProjectLightcone/free-form-action-conditioning';
 ---
 
 <Layout title={title} description={description}>
@@ -94,6 +95,7 @@ const samplePanelPath = `${baseUrl}figures/context-memory-tepa-seed17-sample-pan
 		<nav class="topbar" aria-label="Primary">
 			<a href="#results">Results</a>
 			<a href="#analysis">Analysis</a>
+			<a href={repoUrl}>Code</a>
 		</nav>
 		<div class="hero-inner">
 			<p class="kicker">Technical note | May 28, 2026</p>
@@ -101,6 +103,10 @@ const samplePanelPath = `${baseUrl}figures/context-memory-tepa-seed17-sample-pan
 			<p class="standfirst">
 				A small empirical note on whether the action term in models like LeWorldModel can
 				become a flexible condition encoder for general-purpose prediction and perception.
+			</p>
+			<p class="byline">
+				By Josh York. Code and experiments:
+				<a href={repoUrl}>ProjectLightcone/free-form-action-conditioning</a>.
 			</p>
 			<div class="summary-grid" aria-label="Summary">
 				<div>
@@ -523,6 +529,19 @@ loss_predict =
 		font-size: clamp(1.25rem, 2.4vw, 1.9rem);
 		font-weight: 640;
 		line-height: 1.28;
+	}
+
+	.byline {
+		max-width: 850px;
+		margin: 1rem 0 0;
+		color: oklch(38% 0.026 245);
+		font-size: 0.98rem;
+		font-weight: 640;
+		line-height: 1.55;
+	}
+
+	.byline a {
+		font-weight: 760;
 	}
 
 	.summary-grid {
