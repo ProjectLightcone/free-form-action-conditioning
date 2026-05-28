@@ -1,0 +1,1062 @@
+---
+import Callout from '../components/Callout.astro';
+import GeneratedDiagram from '../components/GeneratedDiagram.astro';
+import Layout from '../layouts/Layout.astro';
+import {
+	applicationSubstrateDiagram,
+	mllmComparisonDiagram,
+	trainingLoopDiagram,
+} from '../data/diagrams';
+
+const title = 'TEPA: A Tri-Embedding Predictive Architecture';
+const description =
+	'A whitepaper draft for TEPA, a flexible condition-conditioned latent world model architecture.';
+---
+
+<Layout title={title} description={description}>
+	<header class="hero">
+		<div class="hero-inner">
+			<p class="kicker">Whitepaper draft | May 22, 2026</p>
+			<h1>TEPA</h1>
+			<p class="subtitle">
+				A Tri-Embedding Predictive Architecture for flexible, instruction-conditioned world
+				modeling.
+			</p>
+			<p class="standfirst">
+				TEPA predicts consequences in latent space. Its central design move is to keep
+				context, condition, and target as distinct learned terms while allowing the condition
+				to be structured, unstructured, multimodal, or mixed.
+			</p>
+		</div>
+	</header>
+
+	<main class="page">
+		<nav class="toc" aria-label="Table of contents">
+			<p>Contents</p>
+			<a href="#abstract">Abstract</a>
+			<a href="#thesis">Core thesis</a>
+			<a href="#conditions">Conditions</a>
+			<a href="#formulation">Formulation</a>
+			<a href="#training">Training</a>
+			<a href="#interface">Interface</a>
+			<a href="#evaluation">Evaluation</a>
+			<a href="#limitations">Limitations</a>
+			<a href="#references">References</a>
+		</nav>
+
+		<article class="paper">
+			<section id="abstract">
+				<h2>Abstract</h2>
+				<p>
+					This whitepaper proposes TEPA, a Tri-Embedding Predictive Architecture for
+					instruction-conditioned world modeling. TEPA extends JEPA-style latent prediction by
+					introducing an explicit condition embedding alongside context and target embeddings.
+					The condition may encode a natural-language instruction, structured action, query,
+					objective, attention target, counterfactual intervention, prediction horizon,
+					demonstration, tool trace, or multimodal prompt. The model predicts a target latent
+					rather than directly producing text, pixels, or control outputs.
+				</p>
+				<p>
+					The motivation is to separate latent consequence prediction from domain-constrained
+					action spaces. LeJEPA provides a theory-grounded JEPA objective with SIGReg, while
+					LeWorldModel demonstrates that a JEPA-style world model can learn next-embedding
+					prediction from pixels when conditioned on environment-specific numeric actions.
+					TEPA keeps the same basic prediction logic but generalizes the conditioning
+					interface itself. The action vector becomes a broad condition representation that can
+					carry language, structure, numeric controls, horizons, goals, and task objectives.
+				</p>
+				<p>
+					The proposal is intentionally framed as a whitepaper architecture rather than a
+					completed empirical result. Its claim is not that TEPA is already a general-purpose
+					world model, but that condition-factorized latent prediction is a plausible route
+					toward one. The key design principle is: predict consequences in latent space;
+					decode, retrieve, probe, plan, or control only when needed.
+				</p>
+			</section>
+
+			<section id="thesis">
+				<h2>1. Core Thesis</h2>
+				<Callout title="Core thesis" tone="thesis">
+					<p>
+						TEPA extends JEPA-style latent prediction from a context-target architecture to a
+						tri-embedding architecture over context, condition, and target. By replacing fixed
+						environment action vectors with an explicit condition encoder, TEPA aims to create a
+						flexible latent world model whose predictive perspective can be shifted by both
+						structured and unstructured inputs.
+					</p>
+				</Callout>
+				<p>
+					JEPA-style systems learn by predicting representations of targets from
+					representations of context. This is attractive because the model need not reconstruct
+					every low-level detail of the target; it can learn to preserve the structure needed
+					for prediction, planning, and downstream use. In image and video settings, this can
+					mean predicting masked regions or future latent states rather than raw pixels.
+				</p>
+				<p>
+					World-model variants add a further need: prediction should depend on what is done,
+					asked, attended to, changed, or sought. A robot action, a time horizon, a
+					driving-risk question, a spreadsheet query, or a counterfactual intervention can all
+					alter what target representation should be predicted.
+				</p>
+				<p>
+					Humans do something similar. Perception is not detached from goals: what a person
+					notices in a room changes when they are looking for a chair, checking for danger,
+					remembering where they left keys, or planning a path through a crowd. TEPA treats
+					the condition as the machine-learning analogue of that perspective shift.
+				</p>
+			</section>
+
+			<section id="conditions">
+				<h2>2. From Domain Actions to Flexible Conditions</h2>
+				<p>
+					The central design move is to replace a domain-specific action input with a broader
+					condition input. In LeWorldModel, the predictor receives a latent state and an
+					environment action, then predicts the next latent state. That is already an important
+					architectural clue: the action is not merely another observation. It is the control
+					variable that determines which future should be predicted.
+				</p>
+				<p>
+					TEPA generalizes that control variable. The condition encoder is meant to support
+					numeric motor commands, natural-language instructions, structured action records,
+					analysis queries, attention objectives, counterfactual interventions, explicit
+					horizons, demonstrations, and mixed prompts. In dynamic settings, the condition may
+					describe a transition. In analytic settings, it may describe what should be extracted
+					or preserved. In planning settings, it may describe candidate actions to roll
+					forward.
+				</p>
+				<Callout title="No mandatory schema">
+					<p>
+						TEPA does not require a typed schema at the base-model boundary. A later distilled
+						model may expose a stricter task-specific interface, but the base architecture is
+						meant to learn from many condition surfaces: prose, JSON, tables, gestures,
+						trajectories, tool traces, and demonstrations.
+					</p>
+				</Callout>
+				<p>
+					This is why condition is the preferred umbrella term. Transition is useful when
+					discussing state change, but too narrow for queries such as "can this budget absorb
+					a $500 car repair next month?" or "analyze this sentence according to Universal
+					Dependencies." The predictor is the latent transition or task operator; the condition
+					is the embedded signal that tells the predictor which operator behavior is needed.
+				</p>
+			</section>
+
+			<section id="formulation">
+				<h2>3. TEPA Formulation</h2>
+				<GeneratedDiagram diagram={trainingLoopDiagram} />
+				<p>
+					Let <code>x</code> denote the observed context, <code>c</code> denote the condition,
+					and <code>y_c</code> denote the true target under that condition. TEPA learns a
+					context encoder <code>E_context</code>, a condition encoder
+					<code>E_condition</code>, a target encoder <code>E_target</code>, and a predictor
+					<code>P</code>. The predictor maps a context embedding and a condition embedding to
+					a predicted target embedding.
+				</p>
+				<pre><code>z_context = E_context(x)
+z_condition = E_condition(c)
+z_hat_target = P(z_context, z_condition)
+z_target = E_target(y_c)
+L_pred = d(z_hat_target, z_target)</code></pre>
+				<p>
+					The target <code>y_c</code> may be a future observation, masked region, parsed
+					structure, answer state, risk state, retrieved example, counterfactual outcome, or
+					a richer conditioned outcome bundle. The condition <code>c</code> determines which
+					target should be predicted. This makes TEPA a tri-embedding architecture: context,
+					condition, and target are modeled as distinct latent terms rather than being collapsed
+					into a single context representation.
+				</p>
+				<p>
+					In the core formulation, the condition embedding feeds the predictor only. The target
+					embedding is already the conditioned true target. If the condition is "collision risk
+					in five seconds," then <code>y_c</code> is the corresponding collision-risk target. If
+					the condition is "can this budget absorb a $500 car repair next month?" then
+					<code>y_c</code> is the corresponding budget-stress target. No second loss-side
+					condition term is required.
+				</p>
+
+				<h3>Shared Latent Outcome Space</h3>
+				<p>
+					The intended target space is a shared latent substrate across output types, not a
+					separate handcrafted space for every task. In practice, this substrate may be a set of
+					latent tokens, a hierarchy of embeddings, or a Matryoshka-style representation with
+					coarse-to-fine prefixes. It should be universal enough to compare, retrieve, decode,
+					probe, and roll forward outcomes, while still preserving the details that conditions
+					make relevant.
+				</p>
+				<p>
+					A single shared target space does not mean a single vague vector that must mean
+					everything at once. The stronger claim is that there can be a shared outcome substrate
+					that can represent many kinds of conditioned targets. The condition selects which true
+					target is produced or constructed for a training example; it does not need to be passed
+					again into the loss.
+				</p>
+
+				<h3>Coherence Hypothesis</h3>
+				<p>
+					The concrete hypothesis is that target latents become coherent when they are organized
+					around outcome factors rather than output formats. Images, trajectories, parses,
+					budget states, code impacts, and counterfactuals are different surfaces, but useful
+					predictions often preserve recurring factors: entities, relations, quantities,
+					temporal structure, constraints, uncertainty, evidence, and affordances. TEPA bets
+					that these factors can share a representational substrate even when the downstream
+					decoder or probe differs.
+				</p>
+				<p>
+					This should be treated as an empirical claim, not an assumption. The first version of
+					TEPA does not need to prove universal cross-domain alignment. It needs to show that a
+					single target space can stay coherent as conditions vary within one grounded domain,
+					then progressively earn broader sharing.
+				</p>
+				<ol>
+					<li>
+						<strong>Intra-domain coherence:</strong> train one target space in puck world across
+						final positions, trajectory heatmaps, collision events, and uncertainty. Test whether
+						shared latents support multiple probes without sacrificing prediction quality.
+					</li>
+					<li>
+						<strong>Condition-surface alignment:</strong> express the same intervention as text,
+						structured records, arrows, and demonstrations. Test whether equivalent conditions
+						produce nearby target latents and decoded outcomes.
+					</li>
+					<li>
+						<strong>Outcome-factor transfer:</strong> add new conditions that query different
+						factors of the same rollout, such as contact risk, goal success, or time-to-contact.
+						Test whether the existing target space supports new probes with limited additional
+						supervision.
+					</li>
+					<li>
+						<strong>Cross-domain expansion:</strong> only after the above succeeds, introduce a
+						second domain that shares abstract factors, such as trajectories, quantities,
+						constraints, or uncertainty. Test whether shared dimensions improve transfer rather
+						than blur domain-specific detail.
+					</li>
+				</ol>
+
+				<h3>Conditioned Outcome Bundles</h3>
+				<p>
+					The conditioned target should often be richer than the direct answer. A useful world
+					model should not only learn that the answer is "yes," "no," "9.4," or "high risk." It
+					should preserve the supporting latent factors that make the answer useful for probes,
+					decoders, retrievers, planners, and controllers.
+				</p>
+				<p>
+					For a budget question about absorbing a $500 car repair, the target could preserve the
+					primary answer, projected cash balance, due dates, committed expenses, discretionary
+					categories, likely shortfall, alternative scenarios, confidence, and source cells. For
+					a collision-risk condition, the target could preserve plausible trajectories, object
+					identities, relative velocities, time-to-contact, uncertainty, risk contributors, and
+					safe-action affordances.
+				</p>
+				<p>
+					This does not require a mandatory external schema. The target can be a dense latent
+					outcome representation. But the richness is not free: each recoverable facet needs
+					training pressure from labels, simulators, mechanical extraction, contrastive
+					structure, self-supervised prediction, downstream probe losses, or retrieval
+					objectives.
+				</p>
+
+				<h3>Rich Outcome Datasets</h3>
+				<p>
+					Some datasets may store a rich full outcome <code>Y</code>, such as a future video,
+					simulator rollout, tool trace, or complete table state, rather than a separate
+					conditioned target for every possible condition. That does not make the conditioned
+					target appear for free. TEPA still needs a target-construction mechanism:
+				</p>
+				<pre><code>y_c = T(Y, c)
+z_target = E_target(y_c)</code></pre>
+				<p>
+					The function <code>T</code> may be mechanical indexing, masking, a simulator or
+					oracle, a formula engine, an annotation pipeline, or an auxiliary learned extractor
+					trained with its own supervision and anti-collapse constraints. Without such a
+					mechanism, the math is underidentified: the model has no way to know which aspect of
+					<code>Y</code> is the true target for <code>c</code>.
+				</p>
+			</section>
+
+			<section id="mllm">
+				<h2>4. Why This Is Not Just a Multimodal LLM</h2>
+				<GeneratedDiagram diagram={mllmComparisonDiagram} />
+				<p>
+					A multimodal LLM can answer many of the same questions in language. The distinction
+					is not capability in principle; it is objective and computational shape. LLMs
+					natively produce token sequences. TEPA natively produces a predicted latent target
+					that can be compared, retrieved, probed, rolled forward, or decoded.
+				</p>
+				<p>
+					LLMs also show that models can learn to interpret both structured and unstructured
+					context in the same prompt. TEPA borrows that intuition but moves the native output
+					away from text and into latent consequence prediction. A practical system could use
+					an LLM to parse intent and explain results, while TEPA evaluates consequences in a
+					compact latent space.
+				</p>
+			</section>
+
+			<section id="training">
+				<h2>5. Training Without a Mandatory Typed Schema</h2>
+				<p>
+					The model is not forced to understand the world merely because the architecture has
+					three embeddings. The pressure has to come from the data, objective, ablations, and
+					curriculum. TEPA should fail if it ignores the condition, fail if it relies only on
+					language priors, fail if it treats numeric distinctions as decoration, and fail if it
+					predicts generic average targets.
+				</p>
+				<pre><code>L_total =
+  d(P(E_context(x), E_condition(c)), E_target(y_c))
+  + lambda * R(Z)</code></pre>
+				<p>
+					An early implementation could reuse a LeJEPA-style objective adapted to a conditioned
+					predictor: prediction loss plus SIGReg or a related anti-collapse regularizer. A
+					frozen target encoder can simplify early experiments, because collapse is less likely
+					when the target representation is fixed. If training examples store full outcomes
+					<code>Y</code> rather than conditioned targets, the target should first be constructed
+					as <code>y_c = T(Y, c)</code>. A scalable version likely needs learned
+					representations, regularization, uncertainty modeling, and careful target construction.
+				</p>
+
+				<h3>Condition Equivalence</h3>
+				<p>
+					The base model should learn that different condition surfaces can express the same
+					latent intervention. A movement can be written in prose, represented as structured
+					data, shown as an arrow, implied by a before/after pair, or demonstrated in a trace.
+					Training should include matched families such as:
+				</p>
+				<ul>
+					<li>"move the dot left seven cells"</li>
+					<li><code>&#123; action: "move", dx: -7, unit: "cell" &#125;</code></li>
+					<li>an arrow gesture over the context</li>
+					<li>a short demonstration trajectory</li>
+					<li>"where will it be after this command?"</li>
+				</ul>
+				<p>
+					The point is not to privilege the structured form. The point is to make the model
+					learn that many representational forms can bind to the same underlying intervention.
+				</p>
+
+				<h3>Training Pressures</h3>
+				<ul>
+					<li>Same context, many different conditions, many different targets.</li>
+					<li>Same condition meaning expressed in structured and unstructured forms.</li>
+					<li>Tiny changes in magnitude, reference frame, horizon, or goal that alter the target.</li>
+					<li>Impossible, underspecified, or contradictory conditions.</li>
+					<li>Mechanical, oracle-derived, or separately supervised target construction when training from rich full outcomes.</li>
+					<li>Cross-modal targets: image, state, text, measurement, retrieval neighbor, control outcome.</li>
+					<li>Shuffled-condition negatives and condition-only or context-only baselines.</li>
+					<li>Long-horizon rollouts where compounding error exposes weak dynamics.</li>
+				</ul>
+				<Callout title="Architectural risk" tone="risk">
+					<p>
+						A universal target space can become too soft unless the training curriculum makes
+						distinct outcomes painfully real. TEPA needs grounded interventions, dense
+						counterfactual pairs, multi-scale prediction, and evaluation tasks that reward world
+						understanding rather than fluent condition paraphrase.
+					</p>
+				</Callout>
+			</section>
+
+			<section id="interface">
+				<h2>6. Predicted Latents as an Application Interface</h2>
+				<GeneratedDiagram diagram={applicationSubstrateDiagram} />
+				<p>
+					The predicted embedding is useful because it does not commit the system to one output
+					format. A decoder can make the latent visible as an image, waveform, parse, or state.
+					A probe can extract a quantity such as budget slack, phase, risk, or object position.
+					A retriever can find real examples close to the predicted consequence. A planner can
+					compare candidate predicted latents against a goal or risk latent.
+				</p>
+				<p>
+					This makes TEPA similar to an embedding model with a steering wheel: the context tells
+					the model what is present, and the condition tells it which consequence, aspect,
+					horizon, or target relation should matter.
+				</p>
+				<table>
+					<caption>Example condition surfaces and target emphases</caption>
+					<thead>
+						<tr>
+							<th>Domain</th>
+							<th>Context plus condition</th>
+							<th>Target latent emphasis</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>Finance</td>
+							<td>household budget plus "Can this absorb a $500 car repair next month?"</td>
+							<td>Cash timing, committed bills, discretionary slack, shortfall risk, confidence.</td>
+						</tr>
+						<tr>
+							<td>Linguistics</td>
+							<td>sentence plus "Analyze under Universal Dependencies"</td>
+							<td>Dependency arcs, grammatical relations, ambiguity.</td>
+						</tr>
+						<tr>
+							<td>Driving</td>
+							<td>camera feed plus "collision-relevant objects in 5 seconds; velocity 34 mph"</td>
+							<td>Objects, trajectories, relative velocity, uncertainty.</td>
+						</tr>
+						<tr>
+							<td>Robotics</td>
+							<td>workcell video plus structured gripper command</td>
+							<td>Future latent for grasp planning and candidate action comparison.</td>
+						</tr>
+						<tr>
+							<td>Simulation</td>
+							<td>physics state plus "add 5 degrees Celsius"</td>
+							<td>Counterfactual latent after the intervention.</td>
+						</tr>
+						<tr>
+							<td>Code</td>
+							<td>repository state plus "change the auth API contract"</td>
+							<td>Affected modules, tests, and integration risks.</td>
+						</tr>
+						<tr>
+							<td>Science</td>
+							<td>time series plus "predict 10 units ahead"</td>
+							<td>Phase, dynamics, uncertainty, extrapolation quality.</td>
+						</tr>
+					</tbody>
+				</table>
+			</section>
+
+			<section id="evaluation">
+				<h2>7. Primary Evaluation: Puck World</h2>
+				<p>
+					A credible first evaluation should be narrow, synthetic, and hard to fake. The goal
+					is not to demonstrate generality immediately; it is to test the architectural premise
+					that a separate condition path improves controllability, condition-form
+					generalization, and multi-query reuse.
+				</p>
+				<p>
+					The proposed first test is a top-down 2D puck world. The context is a rendered scene
+					containing colored pucks, walls, obstacles, and optionally a goal zone. The condition
+					describes an intervention or prediction horizon. The simulator produces the
+					conditioned outcome bundle after the intervention.
+				</p>
+				<table>
+					<caption>Puck-world evaluation setup</caption>
+					<tbody>
+						<tr>
+							<th>Context</th>
+							<td>Top-down image or state grid with pucks, walls, obstacles, and goals.</td>
+						</tr>
+						<tr>
+							<th>Condition surfaces</th>
+							<td>
+								Equivalent interventions expressed as prose, structured records, arrows drawn on
+								the scene, or short demonstration traces.
+							</td>
+						</tr>
+						<tr>
+							<th>Example condition</th>
+							<td>
+								"Push the blue puck up-left with medium force. Predict 40 frames ahead."
+							</td>
+						</tr>
+						<tr>
+							<th>Conditioned target</th>
+							<td>
+								Final positions, trajectory heatmaps, collision events, goal/contact flags,
+								time-to-contact, and uncertainty when noisy rollouts are sampled.
+							</td>
+						</tr>
+					</tbody>
+				</table>
+				<p>
+					The key test is semantic invariance plus physical sensitivity. The same context plus
+					semantically equivalent conditions should produce the same predicted outcome. The same
+					context plus slightly different force, direction, object, or horizon conditions should
+					produce different predicted outcomes.
+				</p>
+				<p>
+					Evaluation should include latent error, decoded target error, retrieval rank of the
+					true target, collision-event accuracy, final-position error, trajectory heatmap
+					quality, condition ablations, paraphrase invariance, magnitude sensitivity, horizon
+					generalization, and composition tests. The decisive baseline is a context-stuffed
+					JEPA-style model that receives the condition bundled into the context.
+				</p>
+				<p>
+					The current puck-world result is intentionally modest but informative. Across a
+					fixed-data, fixed-target, three-seed comparison, a latent TEPA model, a
+					context-memory TEPA variant, and a context-stuffed JEPA transformer baseline
+					perform in the same broad range on the first JSON-only benchmark. The
+					context-memory variant is currently the strongest and most stable overall, while
+					the context-stuffed JEPA baseline remains a serious comparator and wins one counterfactual event
+					metric. This does not support a categorical accuracy-superiority claim for TEPA. It
+					sharpens the claim: TEPA should be judged on whether it preserves competitive
+					prediction quality while improving modularity, condition-path diagnostics, and
+					amortized inference when many counterfactual conditions are evaluated against the
+					same context.
+				</p>
+				<p>Values are mean +/- standard deviation across seeds 17, 43, and 101. Bold values mark the current winner for each metric.</p>
+				<table>
+					<thead>
+						<tr>
+							<th>Metric</th>
+							<th>Standard TEPA</th>
+							<th>Context-Memory TEPA</th>
+							<th>Context-Stuffed JEPA</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>Validation target latent MSE</td>
+							<td>0.073806 +/- 0.000692</td>
+							<td><strong>0.059853 +/- 0.003236</strong></td>
+							<td>0.091188 +/- 0.043016</td>
+						</tr>
+						<tr>
+							<td>Validation final-position MSE</td>
+							<td>0.006069 +/- 0.000132</td>
+							<td><strong>0.004966 +/- 0.000360</strong></td>
+							<td>0.006445 +/- 0.003753</td>
+						</tr>
+						<tr>
+							<td>Validation wall-contact F1</td>
+							<td>0.976738 +/- 0.002419</td>
+							<td><strong>0.980101 +/- 0.001245</strong></td>
+							<td>0.976719 +/- 0.004538</td>
+						</tr>
+						<tr>
+							<td>Counterfactual target latent MSE</td>
+							<td>0.762004 +/- 0.013295</td>
+							<td><strong>0.661938 +/- 0.007201</strong></td>
+							<td>0.852729 +/- 0.019713</td>
+						</tr>
+						<tr>
+							<td>Counterfactual final-position MSE</td>
+							<td>0.068043 +/- 0.001533</td>
+							<td><strong>0.061505 +/- 0.000877</strong></td>
+							<td>0.068403 +/- 0.001572</td>
+						</tr>
+						<tr>
+							<td>Counterfactual wall-contact F1</td>
+							<td>0.899413 +/- 0.006541</td>
+							<td>0.901635 +/- 0.011977</td>
+							<td><strong>0.919787 +/- 0.012805</strong></td>
+						</tr>
+						<tr>
+							<td>Prediction-to-target linear R2</td>
+							<td>0.913299 +/- 0.002923</td>
+							<td><strong>0.932091 +/- 0.001762</strong></td>
+							<td>0.906237 +/- 0.044096</td>
+						</tr>
+						<tr>
+							<td>Final-position probe R2</td>
+							<td>0.948676 +/- 0.001893</td>
+							<td><strong>0.958487 +/- 0.001430</strong></td>
+							<td>0.935375 +/- 0.033108</td>
+						</tr>
+						<tr>
+							<td>Condition-parameter probe R2</td>
+							<td>0.776008 +/- 0.008914</td>
+							<td><strong>0.818038 +/- 0.017387</strong></td>
+							<td>0.724755 +/- 0.050849</td>
+						</tr>
+					</tbody>
+				</table>
+				<p>
+					The amortized counterfactual benchmark remains the clearest runtime test: encode one
+					scene once, evaluate many conditions, and compare total latency, memory, prediction
+					quality, condition-shuffle degradation, and stability against a strong context-stuffed JEPA baseline
+					that must reprocess the combined context-condition input for each query.
+				</p>
+				<p>
+					The current result should be interpreted as parity plus amortization, with
+					context-memory TEPA as the best current candidate rather than a settled winner. One
+					important caveat is that the context-stuffed JEPA baseline trains a joint context-condition encoder
+					end to end for this task, while the TEPA variants used pretrained frozen condition
+					encoders. That may let the JEPA baseline learn a more purpose-built task interface.
+					The next fairness ablation should compare frozen-condition TEPA, fine-tuned-condition
+					TEPA, scratch-condition TEPA, and context-stuffed early interaction on the same fixed target
+					space.
+				</p>
+				<p>
+					The identifiability report follows the newer LeJEPA identifiability analysis: it asks
+					whether target and predicted latents behave like useful world coordinates, not merely
+					whether the decoder heads score well. For each run, the report measures latent
+					Gaussianity, direct prediction-to-target alignment, orthogonal Procrustes alignment,
+					and linear probes from <code>z_target</code> and <code>z_hat_target</code> to simulator
+					state, condition parameters, final position, contact variables, and trajectory
+					summaries.
+				</p>
+				<p>
+					This parity result is still encouraging for the broader research direction. It suggests
+					that conditioned latent prediction may be the more important idea than any single
+					factorization choice. A context-stuffed JEPA transformer is a strong route when
+					early cross-attention between world state and condition is valuable. TEPA is a strong
+					route when reusable world embeddings, modular condition encoders, and many
+					counterfactual queries over the same context matter. A third candidate,
+					context-memory TEPA, caches the context as reusable patch tokens and lets the
+					condition perform a cheap cross-attention readout. These should be viewed as
+					different points in a design space for general-purpose prediction models, not as a
+					simple winner-take-all comparison.
+				</p>
+			</section>
+
+			<section id="prior-work">
+				<h2>8. Relationship to Prior Work</h2>
+				<p>
+					LeJEPA is the closest source for the training objective: it provides the theory and
+					practical recipe for pairing JEPA predictive loss with SIGReg, avoiding many
+					heuristic self-supervised training devices. LeWorldModel is the closest world-model
+					precedent: it applies that style of objective to pixels and environment-specific
+					actions. TEPA borrows from both but changes the conditioning interface. Instead of a
+					fixed numeric action vector, TEPA proposes a learned condition interface intended to
+					support instructions, structured actions, unstructured prompts, queries, objectives,
+					counterfactuals, and horizons.
+				</p>
+				<p>
+					Klindt, LeCun, and Balestriero's follow-up identifiability analysis sharpens the
+					reason SIGReg matters. In their setting, Gaussian latent regularization is not only a
+					collapse-prevention device; under stationary additive-noise latent dynamics, it is
+					part of the condition under which LeJEPA can recover world coordinates up to
+					rotation. TEPA does not inherit that theorem automatically, because its target is
+					conditioned and its condition interface may be text, structure, or goals. But the
+					paper gives this work a better evaluation lens: target-space Gaussianity,
+					linear-probe recoverability, and latent-space planning should be measured alongside
+					endpoint prediction metrics.
+				</p>
+				<p>
+					TEPA also relates to I-JEPA and V-JEPA as representation-prediction methods, V-JEPA
+					2 as a bridge toward action-conditioned physical planning, and language-conditioned
+					world-model work such as PAN and Dynalang. Its distinct emphasis is not video
+					generation, language response, or a single control benchmark. It is explicit
+					condition factorization as a route toward reusable latent consequence prediction.
+				</p>
+			</section>
+
+			<section id="limitations">
+				<h2>9. Limitations and Open Questions</h2>
+				<p>
+					The phrase general-purpose should be treated as an aspiration, not an achieved
+					property. TEPA creates an architectural opening for broader conditioning, but
+					generality would have to be earned through data, grounding, scale, evaluation, and
+					downstream usefulness.
+				</p>
+				<ul>
+					<li>
+						<strong>Grounding:</strong> language can describe actions the model has never seen.
+						The model only understands consequences grounded in trajectories, simulations, tool
+						traces, supervised targets, or embodied interaction.
+					</li>
+					<li>
+						<strong>Numeric precision:</strong> text embeddings alone may not preserve quantities,
+						units, reference frames, and compositional structure well enough for control.
+					</li>
+					<li>
+						<strong>Representation design:</strong> target embeddings must preserve
+						condition-relevant details instead of washing them out through invariance.
+					</li>
+					<li>
+						<strong>Uncertainty:</strong> long-horizon predictions may need distributions,
+						ensembles, diffusion-style latent samplers, or energy models rather than point
+						embeddings.
+					</li>
+					<li>
+						<strong>Multi-resolution target embeddings:</strong> Matryoshka Representation
+						Learning could make TEPA target latents usable at multiple prefix dimensions, enabling
+						cheap coarse consequence prediction and higher-fidelity prediction when more
+						dimensions are available.
+					</li>
+					<li>
+						<strong>Evaluation:</strong> the separate condition path must outperform or clarify
+						behavior relative to a monolithic context baseline.
+					</li>
+				</ul>
+			</section>
+
+			<section id="conclusion">
+				<h2>10. Conclusion</h2>
+				<p>
+					TEPA reframes action-conditioned JEPA world modeling as condition-conditioned latent
+					consequence prediction. JEPA decouples prediction from raw target reconstruction;
+					LeWorldModel shows the utility of explicit action conditioning for latent dynamics;
+					TEPA asks whether that conditioning interface can be generalized beyond a single
+					domain's action space.
+				</p>
+				<p>
+					If the condition encoder can learn to represent instructions, structured actions,
+					queries, horizons, demonstrations, goals, and counterfactual interventions in a
+					dynamics-relevant space, TEPA could become a reusable substrate for prediction,
+					retrieval, planning, perception, and control. That is the ambitious path: not a claim
+					that general-purpose world modeling has been solved, but a concrete architectural
+					route for trying.
+				</p>
+			</section>
+
+			<section id="references">
+				<h2>References</h2>
+				<ol class="references">
+					<li>
+						Balestriero, R., and LeCun, Y. (2025). LeJEPA: Provable and Scalable
+						Self-Supervised Learning Without the Heuristics.
+						<a href="https://arxiv.org/abs/2511.08544">https://arxiv.org/abs/2511.08544</a>
+					</li>
+					<li>
+						Maes, L., Le Lidec, Q., Scieur, D., LeCun, Y., and Balestriero, R. (2026).
+						LeWorldModel: Stable End-to-End Joint-Embedding Predictive Architecture from
+						Pixels. <a href="https://arxiv.org/abs/2603.19312">https://arxiv.org/abs/2603.19312</a>
+					</li>
+					<li>LeWorldModel project page. <a href="https://le-wm.github.io/">https://le-wm.github.io/</a></li>
+					<li>
+						Klindt, D., LeCun, Y., and Balestriero, R. (2026). When Does LeJEPA Learn a
+						World Model? <a href="https://arxiv.org/abs/2605.26379">https://arxiv.org/abs/2605.26379</a>
+					</li>
+					<li>
+						Assran, M. et al. (2023). Self-Supervised Learning from Images with a
+						Joint-Embedding Predictive Architecture.
+						<a href="https://arxiv.org/abs/2301.08243">https://arxiv.org/abs/2301.08243</a>
+					</li>
+					<li>
+						Meta AI. V-JEPA 2: Self-Supervised Video Models Enable Understanding, Prediction
+						and Planning.
+						<a href="https://ai.meta.com/research/publications/v-jepa-2-self-supervised-video-models-enable-understanding-prediction-and-planning/">Meta research publication</a>
+					</li>
+					<li>
+						Xiang, J. et al. (2025). PAN: A World Model for General, Interactable, and
+						Long-Horizon World Simulation.
+						<a href="https://arxiv.org/abs/2511.09057">https://arxiv.org/abs/2511.09057</a>
+					</li>
+					<li>
+						Lin, J. et al. (2024). Learning to Model the World with Language.
+						<a href="https://arxiv.org/abs/2308.01399">https://arxiv.org/abs/2308.01399</a>
+					</li>
+					<li>
+						Hafner, D. et al. (2023). Mastering Diverse Domains through World Models.
+						<a href="https://arxiv.org/abs/2301.04104">https://arxiv.org/abs/2301.04104</a>
+					</li>
+					<li>
+						Kusupati, A. et al. (2022). Matryoshka Representation Learning.
+						<a href="https://arxiv.org/abs/2205.13147">https://arxiv.org/abs/2205.13147</a>
+					</li>
+					<li>
+						LeCun, Y. (2022). A Path Towards Autonomous Machine Intelligence.
+						<a href="https://pdfhost.io/v/Iswk5JqK0_10356_a_path_towards_autonomous_mach_1">PDF</a>
+					</li>
+				</ol>
+			</section>
+		</article>
+	</main>
+</Layout>
+
+<style>
+	.hero {
+		background:
+			linear-gradient(180deg, oklch(93% 0.028 218), oklch(97.5% 0.006 242) 82%),
+			oklch(96% 0.01 242);
+		border-bottom: 1px solid oklch(84% 0.025 235);
+	}
+
+	.hero-inner {
+		width: min(1120px, calc(100% - 2rem));
+		margin: 0 auto;
+		padding: 5.5rem 0 3.25rem;
+	}
+
+	.kicker {
+		margin: 0 0 1.1rem;
+		color: oklch(38% 0.05 230);
+		font-size: 0.82rem;
+		font-weight: 760;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+	}
+
+	h1 {
+		margin: 0;
+		color: oklch(18% 0.035 248);
+		font-size: clamp(4rem, 14vw, 9.5rem);
+		line-height: 0.88;
+		letter-spacing: 0;
+	}
+
+	.subtitle {
+		max-width: 850px;
+		margin: 1.15rem 0 0;
+		color: oklch(25% 0.045 242);
+		font-size: clamp(1.45rem, 3vw, 2.4rem);
+		font-weight: 680;
+		line-height: 1.12;
+	}
+
+	.standfirst {
+		max-width: 760px;
+		margin: 1.35rem 0 0;
+		color: oklch(38% 0.034 245);
+		font-size: 1.13rem;
+		line-height: 1.7;
+	}
+
+	.page {
+		display: grid;
+		grid-template-columns: minmax(13rem, 16rem) minmax(0, 820px);
+		gap: 4rem;
+		width: min(1120px, calc(100% - 2rem));
+		margin: 0 auto;
+		padding: 3rem 0 5rem;
+	}
+
+	.toc {
+		position: sticky;
+		top: 1.5rem;
+		align-self: start;
+		padding-top: 0.2rem;
+	}
+
+	.toc p {
+		margin: 0 0 0.9rem;
+		color: oklch(32% 0.052 232);
+		font-size: 0.76rem;
+		font-weight: 790;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+	}
+
+	.toc a {
+		display: block;
+		padding: 0.38rem 0;
+		color: oklch(40% 0.028 245);
+		font-size: 0.92rem;
+		line-height: 1.35;
+		text-decoration: none;
+	}
+
+	.toc a:hover {
+		color: oklch(28% 0.09 220);
+	}
+
+	.paper {
+		max-width: 75ch;
+	}
+
+	section {
+		margin-top: 3.25rem;
+		scroll-margin-top: 1rem;
+	}
+
+	section:first-child {
+		margin-top: 0;
+	}
+
+	h2,
+	h3 {
+		color: oklch(20% 0.035 248);
+		letter-spacing: 0;
+	}
+
+	h2 {
+		margin: 0 0 1rem;
+		font-size: clamp(1.7rem, 3vw, 2.35rem);
+		line-height: 1.12;
+	}
+
+	h3 {
+		margin: 2rem 0 0.75rem;
+		font-size: 1.28rem;
+		line-height: 1.25;
+	}
+
+	p,
+	li {
+		color: oklch(29% 0.025 248);
+		font-size: 1.03rem;
+		line-height: 1.72;
+	}
+
+	p {
+		margin: 1rem 0;
+	}
+
+	a {
+		color: oklch(34% 0.11 222);
+		text-underline-offset: 0.16em;
+	}
+
+	code {
+		padding: 0.08rem 0.28rem;
+		border-radius: 4px;
+		background: oklch(92% 0.015 232);
+		color: oklch(26% 0.06 232);
+		font-family:
+			'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, ui-monospace, monospace;
+		font-size: 0.92em;
+	}
+
+	pre {
+		overflow-x: auto;
+		margin: 1.5rem 0;
+		padding: 1rem 1.1rem;
+		border: 1px solid oklch(80% 0.025 236);
+		border-radius: 8px;
+		background: oklch(19% 0.026 247);
+	}
+
+	pre code {
+		display: block;
+		padding: 0;
+		background: transparent;
+		color: oklch(92% 0.012 238);
+		font-size: 0.95rem;
+		line-height: 1.65;
+	}
+
+	ul,
+	ol {
+		margin: 1rem 0 1.25rem;
+		padding-left: 1.35rem;
+	}
+
+	li + li {
+		margin-top: 0.55rem;
+	}
+
+	table {
+		width: 100%;
+		margin: 2rem 0;
+		border-collapse: collapse;
+		border: 1px solid oklch(83% 0.02 238);
+		border-radius: 8px;
+		background: oklch(98.5% 0.004 242);
+		overflow: hidden;
+	}
+
+	caption {
+		margin-bottom: 0.7rem;
+		color: oklch(37% 0.035 242);
+		font-size: 0.9rem;
+		font-weight: 720;
+		text-align: left;
+	}
+
+	th,
+	td {
+		padding: 0.82rem 0.9rem;
+		border-bottom: 1px solid oklch(87% 0.016 238);
+		vertical-align: top;
+		text-align: left;
+	}
+
+	th {
+		background: oklch(92% 0.022 232);
+		color: oklch(25% 0.05 236);
+		font-size: 0.86rem;
+		letter-spacing: 0.03em;
+		text-transform: uppercase;
+	}
+
+	td {
+		color: oklch(31% 0.024 248);
+		font-size: 0.95rem;
+		line-height: 1.55;
+	}
+
+	tr:last-child td {
+		border-bottom: 0;
+	}
+
+	.references {
+		padding-left: 1.2rem;
+	}
+
+	.references li {
+		font-size: 0.94rem;
+		line-height: 1.62;
+		word-break: break-word;
+	}
+
+	@media (max-width: 900px) {
+		.page {
+			display: block;
+		}
+
+		.toc {
+			position: static;
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 0.1rem 1rem;
+			margin-bottom: 2.5rem;
+			padding: 1rem 0;
+			border-top: 1px solid oklch(84% 0.02 235);
+			border-bottom: 1px solid oklch(84% 0.02 235);
+		}
+
+		.toc p {
+			grid-column: 1 / -1;
+		}
+	}
+
+	@media (max-width: 620px) {
+		.hero-inner,
+		.page {
+			width: min(100% - 1.2rem, 1120px);
+		}
+
+		.hero-inner {
+			padding: 3.7rem 0 2.5rem;
+		}
+
+		.toc {
+			grid-template-columns: 1fr;
+		}
+
+		table {
+			display: block;
+			overflow-x: auto;
+			white-space: normal;
+		}
+
+		th,
+		td {
+			min-width: 12rem;
+		}
+	}
+
+	@media print {
+		.hero {
+			background: transparent;
+			border-bottom: 1px solid oklch(75% 0.01 242);
+		}
+
+		.hero-inner,
+		.page {
+			width: auto;
+			margin: 0;
+			padding: 0;
+		}
+
+		.hero-inner {
+			padding-bottom: 1.2rem;
+		}
+
+		.page {
+			display: block;
+		}
+
+		.toc {
+			display: none;
+		}
+
+		h1 {
+			font-size: 58pt;
+		}
+
+		.subtitle {
+			font-size: 20pt;
+		}
+
+		section {
+			break-inside: auto;
+			margin-top: 1.2rem;
+		}
+
+		h2,
+		h3,
+		table,
+		pre {
+			break-inside: avoid;
+		}
+
+		a {
+			color: inherit;
+		}
+	}
+</style>

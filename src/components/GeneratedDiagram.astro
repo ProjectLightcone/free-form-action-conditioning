@@ -1,0 +1,227 @@
+---
+import { Graph, layout } from '@dagrejs/dagre';
+import type { DiagramDefinition, DiagramNode } from '../data/diagrams';
+
+interface Props {
+	diagram: DiagramDefinition;
+}
+
+const { diagram } = Astro.props;
+
+const graph = new Graph().setDefaultEdgeLabel(() => ({}));
+graph.setGraph({
+	rankdir: diagram.rankdir ?? 'LR',
+	nodesep: diagram.nodesep ?? 44,
+	ranksep: diagram.ranksep ?? 72,
+	marginx: 28,
+	marginy: 28,
+});
+
+for (const node of diagram.nodes) {
+	graph.setNode(node.id, {
+		...node,
+		width: node.width ?? 180,
+		height: node.height ?? 74,
+	});
+}
+
+for (const edge of diagram.edges) {
+	graph.setEdge(edge.from, edge.to);
+}
+
+layout(graph);
+
+const graphMeta = graph.graph();
+const width = Math.ceil(graphMeta.width ?? 960);
+const height = Math.ceil(graphMeta.height ?? 520);
+const isWide = width / height > 2.4;
+const figureId = diagram.title
+	.toLowerCase()
+	.replace(/[^a-z0-9]+/g, '-')
+	.replace(/^-|-$/g, '');
+const markerId = `${figureId}-arrowhead`;
+const nodes = diagram.nodes.map((node) => ({ ...node, ...(graph.node(node.id) as DiagramNode & { x: number; y: number }) }));
+const edges = diagram.edges.map((edge) => graph.edge(edge.from, edge.to));
+
+function edgePath(points: { x: number; y: number }[]) {
+	return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
+}
+
+function lineY(index: number, total: number) {
+	return 50 - (total - 1) * 9 + index * 18;
+}
+---
+
+<figure class:list={['generated-figure', isWide ? 'wide' : 'compact']}>
+	<div class="diagram-shell">
+		<div class="diagram-heading">
+			<p>{diagram.title}</p>
+			{diagram.subtitle && <span>{diagram.subtitle}</span>}
+		</div>
+		<svg
+			class="diagram"
+			viewBox={`0 0 ${width} ${height}`}
+			role="img"
+			aria-labelledby={`${figureId}-title`}
+		>
+			<title id={`${figureId}-title`}>{diagram.caption}</title>
+			<defs>
+				<marker id={markerId} markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+					<path d="M 0 0 L 10 5 L 0 10 z" />
+				</marker>
+			</defs>
+			<g class="edges">
+				{
+					edges.map((edge) => (
+						<path class="edge" d={edgePath(edge.points)} marker-end={`url(#${markerId})`} />
+					))
+				}
+			</g>
+			<g class="nodes">
+				{
+					nodes.map((node) => (
+						<g class:list={['node', node.kind ?? 'input']} transform={`translate(${node.x - (node.width ?? 180) / 2}, ${node.y - (node.height ?? 74) / 2})`}>
+							<rect width={node.width ?? 180} height={node.height ?? 74} rx="10" />
+							<text x={(node.width ?? 180) / 2} y={(node.height ?? 74) / 2}>
+								{node.label.map((line, index) => (
+									<tspan x={(node.width ?? 180) / 2} y={((node.height ?? 74) * lineY(index, node.label.length)) / 100}>
+										{line}
+									</tspan>
+								))}
+							</text>
+						</g>
+					))
+				}
+			</g>
+		</svg>
+	</div>
+	<figcaption>{diagram.caption}</figcaption>
+</figure>
+
+<style>
+	.generated-figure {
+		margin: 2.25rem 0;
+	}
+
+	.diagram-shell {
+		overflow-x: auto;
+		padding: 1rem;
+		border: 1px solid oklch(84% 0.02 238);
+		border-radius: 8px;
+		background: oklch(98.8% 0.005 242);
+	}
+
+	.diagram-heading {
+		margin: 0 0 0.9rem;
+	}
+
+	.diagram-heading p {
+		margin: 0;
+		color: oklch(18% 0.035 248);
+		font-size: 1.1rem;
+		font-weight: 780;
+		line-height: 1.2;
+	}
+
+	.diagram-heading span {
+		display: block;
+		margin-top: 0.3rem;
+		color: oklch(43% 0.03 248);
+		font-size: 0.9rem;
+		line-height: 1.45;
+	}
+
+	.diagram {
+		display: block;
+		width: 100%;
+		height: auto;
+	}
+
+	.edge {
+		fill: none;
+		stroke: oklch(34% 0.055 236);
+		stroke-width: 2.2;
+		stroke-linejoin: round;
+		stroke-linecap: round;
+	}
+
+	marker path {
+		fill: oklch(34% 0.055 236);
+	}
+
+	.node rect {
+		fill: oklch(96% 0.012 236);
+		stroke: oklch(75% 0.035 232);
+		stroke-width: 1.6;
+	}
+
+	.node.encoder rect,
+	.node.target rect {
+		fill: oklch(98% 0.006 242);
+	}
+
+	.node.latent rect,
+	.node.output rect {
+		fill: oklch(92% 0.03 224);
+		stroke: oklch(67% 0.08 222);
+	}
+
+	.node.operator rect {
+		fill: oklch(25% 0.08 238);
+		stroke: oklch(25% 0.08 238);
+	}
+
+	.node.loss rect {
+		fill: oklch(95% 0.03 70);
+		stroke: oklch(70% 0.08 58);
+	}
+
+	.node.warm rect {
+		fill: oklch(95% 0.03 80);
+		stroke: oklch(72% 0.09 75);
+	}
+
+	.node text {
+		fill: oklch(20% 0.035 248);
+		font-size: 15px;
+		font-weight: 700;
+		text-anchor: middle;
+		dominant-baseline: middle;
+	}
+
+	.node.operator text {
+		fill: oklch(98% 0.005 242);
+	}
+
+	.node text tspan + tspan {
+		font-weight: 560;
+	}
+
+	.generated-figure figcaption {
+		margin-top: 0.65rem;
+		color: oklch(43% 0.03 248);
+		font-size: 0.92rem;
+		line-height: 1.55;
+	}
+
+	@media (max-width: 620px) {
+		.diagram-shell {
+			padding: 0.75rem;
+		}
+
+	}
+
+	@media print {
+		.generated-figure {
+			break-inside: avoid;
+		}
+
+		.diagram-shell {
+			overflow: visible;
+		}
+
+		.diagram {
+			width: 100%;
+		}
+	}
+</style>

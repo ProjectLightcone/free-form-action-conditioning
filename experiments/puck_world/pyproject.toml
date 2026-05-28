@@ -1,0 +1,40 @@
+[project]
+name = "tepa-puck-world"
+version = "0.1.0"
+description = "Puck-world vertical-slice evaluation for TEPA."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "matplotlib>=3.9",
+  "numpy>=2.0",
+  "pillow>=10.4",
+  "pydantic>=2.7",
+  "pytest>=8.2",
+  "pyyaml>=6.0",
+  "torch>=2.4",
+  "tqdm>=4.66",
+]
+
+[project.scripts]
+tepa-puck-generate = "tepa_eval.generate:main"
+tepa-puck-validate-data = "tepa_eval.validate_data:main"
+tepa-puck-train = "tepa_eval.train:main"
+tepa-puck-pretrain-target = "tepa_eval.train_target:main"
+tepa-puck-pretrain-condition = "tepa_eval.train_condition:main"
+tepa-puck-evaluate = "tepa_eval.evaluate:main"
+tepa-puck-benchmark-counterfactuals = "tepa_eval.benchmark_counterfactuals:main"
+tepa-puck-analyze-counterfactuals = "tepa_eval.analyze_counterfactuals:main"
+tepa-puck-identifiability-report = "tepa_eval.identifiability:main"
+tepa-puck-compare-seeds = "tepa_eval.compare_seeds:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tepa_eval"]

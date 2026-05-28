@@ -22,3 +22,14 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# TEPA experiment generated artifacts
+__pycache__/
+*.py[cod]
+experiments/puck_world/data/
+experiments/puck_world/reports/
+experiments/puck_world/checkpoints/
+experiments/puck_world/*.sqlite
+experiments/puck_world/.pytest_cache/
+experiments/puck_world/.ruff_cache/
+experiments/puck_world/.venv/

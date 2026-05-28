@@ -1,0 +1,49 @@
+dataset_version: puck-context-memory-smoke
+seed: 31
+output_dir: data/processed/puck-context-memory-smoke
+run_dir: reports/runs
+checkpoint_dir: checkpoints
+image_size: 64
+horizon: 40
+num_scenes: 16
+events_per_scene: 4
+renderings_per_event: 1
+min_pucks: 1
+max_pucks: 2
+friction: 0.985
+restitution: 0.86
+scene_val_fraction: 0.2
+heldout_template_fraction: 0.0
+batch_size: 32
+epochs: 2
+learning_rate: 0.001
+optimizer: adamw
+weight_decay: 0.001
+lr_schedule: cosine
+min_learning_rate: 0.00005
+lr_decay_start_epoch: 0
+early_stopping_enabled: false
+early_stopping_monitor: val_target_latent_mse
+early_stopping_min_delta: 0.0005
+early_stopping_patience: 25
+early_stopping_min_epochs: 2
+latent_dim: 128
+max_text_len: 192
+heatmap_size: 32
+normalize_latents: false
+sigreg_weight: 0.1
+sigreg_num_slices: 1024
+sigreg_num_points: 17
+sigreg_integration_bound: 5.0
+sigreg_on_predictions: false
+prediction_loss_weight: 0.25
+latent_loss_weight: 5.0
+target_reconstruction_loss_weight: 0.0
+context_state_loss_weight: 5.0
+target_sigreg_weight: 0.02
+target_sigreg_warmup_epochs: 10
+target_sigreg_ramp_epochs: 20
+condition_family_filter:
+  - json
+condition_families:
+  json: 1.0

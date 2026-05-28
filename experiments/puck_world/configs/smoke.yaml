@@ -1,0 +1,46 @@
+dataset_version: puck-smoke
+seed: 7
+output_dir: data/processed/puck-smoke
+run_dir: reports/runs
+checkpoint_dir: checkpoints
+image_size: 64
+horizon: 40
+num_scenes: 32
+events_per_scene: 4
+renderings_per_event: 3
+min_pucks: 1
+max_pucks: 2
+friction: 0.985
+restitution: 0.86
+scene_val_fraction: 0.2
+heldout_template_fraction: 0.2
+batch_size: 32
+epochs: 3
+learning_rate: 0.001
+optimizer: adamw
+weight_decay: 0.01
+lr_schedule: cosine
+min_learning_rate: 0.0001
+lr_decay_start_epoch: 0
+early_stopping_enabled: true
+early_stopping_monitor: auto
+early_stopping_min_delta: 0.001
+early_stopping_patience: 12
+early_stopping_min_epochs: 20
+latent_dim: 64
+max_text_len: 192
+heatmap_size: 32
+normalize_latents: false
+sigreg_weight: 0.1
+sigreg_num_slices: 1024
+sigreg_num_points: 17
+sigreg_integration_bound: 5.0
+sigreg_on_predictions: false
+target_sigreg_weight: 0.02
+target_sigreg_warmup_epochs: 2
+target_sigreg_ramp_epochs: 2
+condition_families:
+  natural_language: 0.4
+  json: 0.25
+  yaml: 0.2
+  key_value: 0.15

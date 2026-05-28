@@ -1,11 +1,835 @@
 ---
-import Welcome from '../components/Welcome.astro';
+import GeneratedDiagram from '../components/GeneratedDiagram.astro';
 import Layout from '../layouts/Layout.astro';
+import { actionConditioningNoteDiagram } from '../data/diagrams';
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+const title = 'Action-Conditioned JEPA World Models';
+const description =
+	'A concise technical note on flexible action conditioning, TEPA, context-memory TEPA, and a context-stuffed JEPA baseline.';
+
+const results = [
+	{
+		metric: 'Validation target latent MSE',
+		direction: 'lower',
+		standard: '0.073806 +/- 0.000692',
+		memory: '0.059853 +/- 0.003236',
+		jepa: '0.091188 +/- 0.043016',
+		finetuned: '0.056552 +/- 0.005566',
+		best: 'finetuned',
+	},
+	{
+		metric: 'Validation final-position MSE',
+		direction: 'lower',
+		standard: '0.006069 +/- 0.000132',
+		memory: '0.004966 +/- 0.000360',
+		jepa: '0.006445 +/- 0.003753',
+		finetuned: '0.004817 +/- 0.000577',
+		best: 'finetuned',
+	},
+	{
+		metric: 'Counterfactual target latent MSE',
+		direction: 'lower',
+		standard: '0.762004 +/- 0.013295',
+		memory: '0.661938 +/- 0.007201',
+		jepa: '0.852729 +/- 0.019713',
+		finetuned: '0.665379 +/- 0.017038',
+		best: 'memory',
+	},
+	{
+		metric: 'Counterfactual final-position MSE',
+		direction: 'lower',
+		standard: '0.068043 +/- 0.001533',
+		memory: '0.061505 +/- 0.000877',
+		jepa: '0.068403 +/- 0.001572',
+		finetuned: '0.062827 +/- 0.002676',
+		best: 'memory',
+	},
+	{
+		metric: 'Counterfactual wall-contact F1',
+		direction: 'higher',
+		standard: '0.899413 +/- 0.006541',
+		memory: '0.901635 +/- 0.011977',
+		jepa: '0.919787 +/- 0.012805',
+		finetuned: '0.915015 +/- 0.009644',
+		best: 'jepa',
+	},
+	{
+		metric: 'Prediction-to-target linear R2',
+		direction: 'higher',
+		standard: '0.913299 +/- 0.002923',
+		memory: '0.932091 +/- 0.001762',
+		jepa: '0.906237 +/- 0.044096',
+		finetuned: '0.940719 +/- 0.004914',
+		best: 'finetuned',
+	},
+	{
+		metric: 'Final-position probe R2',
+		direction: 'higher',
+		standard: '0.948676 +/- 0.001893',
+		memory: '0.958487 +/- 0.001430',
+		jepa: '0.935375 +/- 0.033108',
+		finetuned: '0.964519 +/- 0.001034',
+		best: 'finetuned',
+	},
+	{
+		metric: 'Condition-parameter probe R2',
+		direction: 'higher',
+		standard: '0.776008 +/- 0.008914',
+		memory: '0.818038 +/- 0.017387',
+		jepa: '0.724755 +/- 0.050849',
+		finetuned: '0.842086 +/- 0.023732',
+		best: 'finetuned',
+	},
+];
+
+const renderValue = (value: string, key: string, best: string) =>
+	key === best ? `<strong>${value}</strong>` : value;
 ---
 
-<Layout>
-	<Welcome />
+<Layout title={title} description={description}>
+	<header class="hero">
+		<nav class="topbar" aria-label="Primary">
+			<a href="#results">Results</a>
+			<a href="#analysis">Analysis</a>
+			<a href="/tepa">Full TEPA whitepaper</a>
+		</nav>
+		<div class="hero-inner">
+			<p class="kicker">Technical note | May 28, 2026</p>
+			<h1>Flexible action conditioning for JEPA-style world models</h1>
+			<p class="standfirst">
+				A small empirical note on whether action-conditioned latent prediction can support
+				flexible condition surfaces: structured records now, text and richer interventions later.
+			</p>
+			<div class="summary-grid" aria-label="Summary">
+				<div>
+					<span>Question</span>
+					<p>Can we separate world state from condition while keeping predictive quality?</p>
+				</div>
+				<div>
+					<span>Current result</span>
+					<p>Context-memory TEPA is strongest overall, but the JEPA baseline remains competitive.</p>
+				</div>
+				<div>
+					<span>Claim status</span>
+					<p>Promising pilot evidence, not a proof of architectural superiority.</p>
+				</div>
+			</div>
+		</div>
+	</header>
+
+	<main class="page">
+		<aside class="toc" aria-label="Contents">
+			<p>Contents</p>
+			<a href="#abstract">Abstract</a>
+			<a href="#setup">Setup</a>
+			<a href="#models">Models</a>
+			<a href="#results">Results</a>
+			<a href="#analysis">Analysis</a>
+			<a href="#next">Next tests</a>
+			<a href="#references">References</a>
+		</aside>
+
+		<article class="note">
+			<section id="abstract" class="lede">
+				<h2>Abstract</h2>
+				<p>
+					Recent LeJEPA identifiability work argues that learning the right latent space is a
+					central requirement for world modeling, and that action conditioning is a natural next
+					theoretical step. This note explores the empirical companion question: if the action or
+					condition is not a fixed typed vector, can a JEPA-style predictive model still learn a
+					useful outcome space?
+				</p>
+				<p>
+					The experiment uses a deterministic 2D puck-world benchmark. A rendered scene is paired
+					with a condition describing an intervention, and the model predicts a latent target for
+					the resulting rollout. I compare standard TEPA, context-memory TEPA, a context-stuffed
+					JEPA baseline, and a fine-tuned condition-encoder variant. The main result is not that
+					factorization wins outright. It is that explicit condition factorization can stay
+					competitive while creating a cleaner interface for amortized counterfactual prediction.
+				</p>
+			</section>
+
+			<section id="setup">
+				<h2>Setup</h2>
+				<GeneratedDiagram diagram={actionConditioningNoteDiagram} />
+				<p>
+					The working formulation is simple: encode a context, encode a condition, predict the
+					latent outcome. The condition can be a structured intervention today and, eventually,
+					natural language, demonstrations, goals, horizons, or other query surfaces.
+				</p>
+				<pre><code>z_context = E_context(x)
+z_condition = E_condition(c)
+z_hat_target = P(z_context, z_condition)</code></pre>
+				<p>
+					The target side is intentionally explicit. The training target is not raw prose. It is a
+					conditioned outcome bundle produced by the simulator, encoded by a separately pretrained
+					target encoder. That gives the predictor a stable latent target instead of asking it to
+					invent a target space while also learning the dynamics.
+				</p>
+				<figure class="sample-panel">
+					<img
+						src="/figures/context-memory-tepa-seed17-sample-panel.png"
+						alt="Puck-world qualitative prediction panel with context, decoded target, and prediction views."
+						loading="lazy"
+					/>
+					<figcaption>
+						Qualitative sample panel from a context-memory TEPA run. It is useful for error
+						inspection, while the table below is the stronger evidence.
+					</figcaption>
+				</figure>
+			</section>
+
+			<section id="models">
+				<h2>Models Compared</h2>
+				<div class="model-list">
+					<section>
+						<h3>Standard TEPA</h3>
+						<p>
+							A factorized model with separate context and condition encoders. The predictor
+							receives one context vector and one condition vector, then predicts the target
+							latent.
+						</p>
+					</section>
+					<section>
+						<h3>Context-Memory TEPA</h3>
+						<p>
+							A factorized model that keeps reusable context memory tokens and lets the condition
+							read from that memory through cross-attention. This keeps the condition interface
+							explicit while giving the model early interaction between condition and scene.
+						</p>
+					</section>
+					<section>
+						<h3>Context-Stuffed JEPA Baseline</h3>
+						<p>
+							This is essentially a JEPA-style baseline for this benchmark: it predicts the same
+							target latent, but stuffs context and condition into one trainable joint encoder.
+							It is a strong comparator because the joint encoder can become purpose-built for
+							the task.
+						</p>
+					</section>
+					<section>
+						<h3>Fine-Tuned Condition TEPA</h3>
+						<p>
+							A context-memory TEPA variant initialized from the pretrained condition encoder,
+							then allowed to update condition weights during predictor training at a reduced
+							learning rate. Fine-tuned weights are saved separately from the original pretrained
+							checkpoint.
+						</p>
+					</section>
+				</div>
+			</section>
+
+			<section id="results">
+				<h2>Three-Seed Results</h2>
+				<p>
+					Values are mean +/- standard deviation across seeds 17, 43, and 101. Bold cells mark
+					the current winner for each metric. The joint-encoder baseline is named here as a
+					context-stuffed JEPA baseline because it preserves the JEPA-style latent prediction
+					objective while combining condition and context upstream.
+				</p>
+				<div class="table-wrap">
+					<table>
+						<thead>
+							<tr>
+								<th>Metric</th>
+								<th>Direction</th>
+								<th>Standard TEPA</th>
+								<th>Context-Memory TEPA</th>
+								<th>Context-Stuffed JEPA</th>
+								<th>Fine-Tuned Condition TEPA</th>
+							</tr>
+						</thead>
+						<tbody>
+							{
+								results.map((row) => (
+									<tr>
+										<td class="metric-cell">{row.metric}</td>
+										<td data-label="Direction">{row.direction}</td>
+										<td
+											data-label="Standard TEPA"
+											set:html={renderValue(row.standard, 'standard', row.best)}
+										></td>
+										<td
+											data-label="Context-Memory TEPA"
+											set:html={renderValue(row.memory, 'memory', row.best)}
+										></td>
+										<td
+											data-label="Context-Stuffed JEPA"
+											set:html={renderValue(row.jepa, 'jepa', row.best)}
+										></td>
+										<td
+											data-label="Fine-Tuned Condition TEPA"
+											set:html={renderValue(row.finetuned, 'finetuned', row.best)}
+										></td>
+									</tr>
+								))
+							}
+						</tbody>
+					</table>
+				</div>
+			</section>
+
+			<section id="analysis">
+				<h2>Analysis</h2>
+				<p>
+					The most important finding is close performance, not a blowout. The context-stuffed
+					JEPA baseline remains a serious comparator, especially because its joint encoder is
+					trainable end to end on the exact task. That may explain why it performs so well: the
+					encoder can learn a task-specific interaction between scene and condition rather than
+					reusing a pretrained condition representation.
+				</p>
+				<p>
+					Context-memory TEPA looks like the best current compromise. It keeps reusable context
+					memory, preserves a separate condition path, and improves most target/probe metrics.
+					Fine-tuning the condition encoder improves in-domain validation and identifiability
+					probes, but the frozen context-memory model still has slightly better counterfactual
+					target and final-position MSE. That suggests condition adaptation helps, but may also
+					overfit the benchmark distribution unless the training curriculum is broadened.
+				</p>
+				<p>
+					The architectural premise is therefore not moot. The case for TEPA is less "higher
+					accuracy on every metric" and more "competitive accuracy with a reusable condition
+					interface." If one scene must be evaluated against many actions, questions, or goals,
+					the factorized architecture can cache context and run cheaper counterfactual sweeps. If
+					the task only needs one condition per context and maximal early fusion, a context-stuffed
+					JEPA is a very reasonable design.
+				</p>
+			</section>
+
+			<section id="next">
+				<h2>Next Tests</h2>
+				<div class="next-grid">
+					<div>
+						<h3>Identifiability under action conditioning</h3>
+						<p>
+							Measure whether predicted latents recover simulator state, action parameters, and
+							future outcomes through simple linear probes and alignment tests.
+						</p>
+					</div>
+					<div>
+						<h3>Condition encoder ablations</h3>
+						<p>
+							Compare frozen, fine-tuned, delayed-unfreeze, and scratch condition encoders on the
+							same fixed target space.
+						</p>
+					</div>
+					<div>
+						<h3>Flexible condition surfaces</h3>
+						<p>
+							Reintroduce JSON, YAML, key-value text, and natural-language templates after the
+							structured-only benchmark is stable.
+						</p>
+					</div>
+					<div>
+						<h3>Amortized counterfactual sweeps</h3>
+						<p>
+							Encode one context once, evaluate many conditions, and compare quality, latency,
+							and memory against the context-stuffed JEPA baseline.
+						</p>
+					</div>
+				</div>
+			</section>
+
+			<section id="references">
+				<h2>References</h2>
+				<ol class="references">
+					<li>
+						Klindt, D., LeCun, Y., and Balestriero, R. (2026). When Does LeJEPA Learn a
+						World Model? The Role of Identifiability in Latent Space Feature Learning.
+						<a href="https://arxiv.org/abs/2605.26379">arXiv:2605.26379</a>.
+						<a href="https://klindtlab.github.io/lejepa-identifiability/">Project page</a>.
+					</li>
+					<li>
+						Maes, L., Le Lidec, Q., Scieur, D., LeCun, Y., and Balestriero, R. (2026).
+						LeWorldModel: Stable End-to-End Joint-Embedding Predictive Architecture from
+						Pixels. <a href="https://arxiv.org/abs/2603.19312">arXiv:2603.19312</a>.
+					</li>
+					<li>
+						Balestriero, R., and LeCun, Y. (2025). LeJEPA: Provable and Scalable
+						Self-Supervised Learning Without the Heuristics.
+						<a href="https://arxiv.org/abs/2511.08544">arXiv:2511.08544</a>.
+					</li>
+					<li>
+						Full TEPA whitepaper draft:
+						<a href="/tepa">Tri-Embedding Predictive Architecture</a>.
+					</li>
+				</ol>
+			</section>
+		</article>
+	</main>
 </Layout>
+
+<style>
+	:global(body) {
+		background: oklch(97.5% 0.006 95);
+	}
+
+	.hero {
+		border-bottom: 1px solid oklch(86% 0.018 226);
+		background:
+			linear-gradient(180deg, oklch(96.5% 0.011 96), oklch(98.5% 0.004 108) 72%),
+			oklch(98% 0.006 100);
+	}
+
+	.topbar {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.45rem 0.65rem;
+		justify-content: flex-end;
+		width: min(1160px, calc(100% - 2rem));
+		margin: 0 auto;
+		padding: 1rem 0 0;
+	}
+
+	.topbar a {
+		display: inline-flex;
+		align-items: center;
+		min-height: 2.25rem;
+		padding: 0 0.8rem;
+		border: 1px solid oklch(82% 0.02 220);
+		border-radius: 999px;
+		background: oklch(99% 0.003 100 / 75%);
+		color: oklch(29% 0.038 235);
+		font-size: 0.86rem;
+		font-weight: 720;
+		text-decoration: none;
+	}
+
+	.topbar a:hover {
+		border-color: oklch(59% 0.09 210);
+		color: oklch(28% 0.095 210);
+	}
+
+	.hero-inner {
+		width: min(1040px, calc(100% - 2rem));
+		margin: 0 auto;
+		padding: 5rem 0 3.5rem;
+	}
+
+	.kicker {
+		margin: 0 0 1rem;
+		color: oklch(38% 0.044 210);
+		font-size: 0.8rem;
+		font-weight: 780;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	h1 {
+		max-width: 980px;
+		margin: 0;
+		color: oklch(18% 0.025 250);
+		font-size: clamp(3rem, 8vw, 6.6rem);
+		line-height: 0.96;
+		letter-spacing: 0;
+	}
+
+	.standfirst {
+		max-width: 850px;
+		margin: 1.35rem 0 0;
+		color: oklch(31% 0.032 248);
+		font-size: clamp(1.25rem, 2.4vw, 1.9rem);
+		font-weight: 640;
+		line-height: 1.28;
+	}
+
+	.summary-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 1px;
+		margin-top: 2.5rem;
+		border: 1px solid oklch(84% 0.018 218);
+		border-radius: 8px;
+		overflow: hidden;
+		background: oklch(84% 0.018 218);
+	}
+
+	.summary-grid div {
+		min-height: 9.2rem;
+		padding: 1.15rem;
+		background: oklch(99% 0.003 106);
+	}
+
+	.summary-grid span {
+		display: block;
+		color: oklch(39% 0.054 205);
+		font-size: 0.76rem;
+		font-weight: 820;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	.summary-grid p {
+		margin: 0.7rem 0 0;
+		color: oklch(24% 0.028 246);
+		font-size: 1.05rem;
+		font-weight: 640;
+		line-height: 1.42;
+	}
+
+	.page {
+		display: grid;
+		grid-template-columns: minmax(13rem, 16rem) minmax(0, 860px);
+		gap: 4rem;
+		width: min(1160px, calc(100% - 2rem));
+		margin: 0 auto;
+		padding: 3rem 0 5rem;
+	}
+
+	.toc {
+		position: sticky;
+		top: 1.5rem;
+		align-self: start;
+	}
+
+	.toc p {
+		margin: 0 0 0.9rem;
+		color: oklch(36% 0.052 205);
+		font-size: 0.76rem;
+		font-weight: 820;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+	}
+
+	.toc a {
+		display: block;
+		padding: 0.38rem 0;
+		color: oklch(39% 0.026 245);
+		font-size: 0.92rem;
+		line-height: 1.35;
+		text-decoration: none;
+	}
+
+	.toc a:hover {
+		color: oklch(31% 0.09 210);
+	}
+
+	.note {
+		max-width: 78ch;
+	}
+
+	section {
+		margin-top: 3.4rem;
+		scroll-margin-top: 1.2rem;
+	}
+
+	section:first-child {
+		margin-top: 0;
+	}
+
+	h2,
+	h3 {
+		color: oklch(20% 0.03 250);
+		letter-spacing: 0;
+	}
+
+	h2 {
+		margin: 0 0 1rem;
+		font-size: clamp(1.75rem, 3vw, 2.55rem);
+		line-height: 1.1;
+	}
+
+	h3 {
+		margin: 0 0 0.6rem;
+		font-size: 1.08rem;
+		line-height: 1.24;
+	}
+
+	p,
+	li {
+		color: oklch(29% 0.024 248);
+		font-size: 1.03rem;
+		line-height: 1.72;
+	}
+
+	p {
+		margin: 1rem 0;
+	}
+
+	a {
+		color: oklch(34% 0.11 215);
+		text-underline-offset: 0.16em;
+	}
+
+	code {
+		padding: 0.08rem 0.28rem;
+		border-radius: 4px;
+		background: oklch(92% 0.018 205);
+		color: oklch(24% 0.06 220);
+		font-family:
+			'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, ui-monospace, monospace;
+		font-size: 0.92em;
+	}
+
+	pre {
+		overflow-x: auto;
+		margin: 1.5rem 0;
+		padding: 1rem 1.1rem;
+		border: 1px solid oklch(81% 0.022 230);
+		border-radius: 8px;
+		background: oklch(19% 0.025 246);
+	}
+
+	pre code {
+		display: block;
+		padding: 0;
+		background: transparent;
+		color: oklch(93% 0.012 235);
+		font-size: 0.95rem;
+		line-height: 1.65;
+	}
+
+	.sample-panel {
+		margin: 2rem 0;
+	}
+
+	.sample-panel img {
+		display: block;
+		width: 100%;
+		height: auto;
+		border: 1px solid oklch(83% 0.018 230);
+		border-radius: 8px;
+		background: white;
+	}
+
+	figcaption {
+		margin-top: 0.65rem;
+		color: oklch(42% 0.026 245);
+		font-size: 0.9rem;
+		line-height: 1.48;
+	}
+
+	.model-list,
+	.next-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 1px;
+		margin-top: 1.5rem;
+		border: 1px solid oklch(84% 0.018 222);
+		border-radius: 8px;
+		overflow: hidden;
+		background: oklch(84% 0.018 222);
+	}
+
+	.model-list section,
+	.next-grid div {
+		margin: 0;
+		padding: 1.1rem;
+		background: oklch(99% 0.003 106);
+	}
+
+	.model-list p,
+	.next-grid p {
+		margin: 0;
+		font-size: 0.94rem;
+		line-height: 1.58;
+	}
+
+	.table-wrap {
+		width: 100%;
+		margin: 1.7rem 0 0;
+		overflow-x: auto;
+		border: 1px solid oklch(84% 0.018 228);
+		border-radius: 8px;
+		background: oklch(99% 0.003 106);
+	}
+
+	table {
+		width: 100%;
+		min-width: 880px;
+		border-collapse: collapse;
+	}
+
+	th,
+	td {
+		padding: 0.78rem 0.85rem;
+		border-bottom: 1px solid oklch(87% 0.015 228);
+		text-align: left;
+		vertical-align: top;
+	}
+
+	th {
+		background: oklch(93.5% 0.02 210);
+		color: oklch(25% 0.05 226);
+		font-size: 0.78rem;
+		font-weight: 820;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	td {
+		color: oklch(30% 0.024 248);
+		font-size: 0.9rem;
+		line-height: 1.44;
+	}
+
+	tr:last-child td {
+		border-bottom: 0;
+	}
+
+	td strong {
+		color: oklch(21% 0.065 190);
+		font-weight: 860;
+	}
+
+	.references {
+		margin: 1rem 0 0;
+		padding-left: 1.2rem;
+	}
+
+	.references li {
+		font-size: 0.94rem;
+		line-height: 1.62;
+		word-break: break-word;
+	}
+
+	.references li + li {
+		margin-top: 0.6rem;
+	}
+
+	@media (max-width: 940px) {
+		.summary-grid,
+		.model-list,
+		.next-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.summary-grid div {
+			min-height: 0;
+		}
+
+		.page {
+			display: block;
+		}
+
+		.toc {
+			position: static;
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 0.1rem 1rem;
+			margin-bottom: 2.5rem;
+			padding: 1rem 0;
+			border-top: 1px solid oklch(84% 0.02 225);
+			border-bottom: 1px solid oklch(84% 0.02 225);
+		}
+
+		.toc p {
+			grid-column: 1 / -1;
+		}
+	}
+
+	@media (max-width: 640px) {
+		.hero-inner,
+		.topbar,
+		.page {
+			width: min(100% - 1.2rem, 1160px);
+		}
+
+		.hero-inner {
+			padding: 3.2rem 0 2.5rem;
+		}
+
+		.topbar {
+			justify-content: flex-start;
+		}
+
+		.topbar a {
+			font-size: 0.82rem;
+		}
+
+		.toc {
+			grid-template-columns: 1fr;
+		}
+
+		p,
+		li {
+			font-size: 1rem;
+		}
+	}
+
+	@media (max-width: 760px) {
+		.table-wrap {
+			border: 0;
+			background: transparent;
+			overflow: visible;
+		}
+
+		table,
+		thead,
+		tbody,
+		tr,
+		td {
+			display: block;
+			width: 100%;
+			min-width: 0;
+		}
+
+		thead {
+			display: none;
+		}
+
+		tr {
+			margin-bottom: 0.85rem;
+			border: 1px solid oklch(84% 0.018 228);
+			border-radius: 8px;
+			background: oklch(99% 0.003 106);
+			overflow: hidden;
+		}
+
+		td {
+			display: grid;
+			grid-template-columns: minmax(8.5rem, 42%) minmax(0, 1fr);
+			gap: 0.75rem;
+			padding: 0.7rem 0.8rem;
+			border-bottom: 1px solid oklch(88% 0.014 228);
+			font-size: 0.9rem;
+		}
+
+		td::before {
+			content: attr(data-label);
+			color: oklch(35% 0.05 218);
+			font-size: 0.72rem;
+			font-weight: 820;
+			letter-spacing: 0.04em;
+			text-transform: uppercase;
+		}
+
+		.metric-cell {
+			display: block;
+			background: oklch(93.5% 0.02 210);
+			color: oklch(24% 0.045 232);
+			font-weight: 820;
+		}
+
+		.metric-cell::before {
+			content: none;
+		}
+	}
+
+	@media print {
+		.topbar,
+		.toc {
+			display: none;
+		}
+
+		.hero {
+			background: transparent;
+			border-bottom: 1px solid oklch(78% 0.01 240);
+		}
+
+		.hero-inner,
+		.page {
+			width: auto;
+			margin: 0;
+			padding: 0;
+		}
+
+		h1 {
+			font-size: 42pt;
+		}
+
+		.page {
+			display: block;
+		}
+	}
+</style>

@@ -12,6 +12,7 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.0.0",
     "astro": "^6.3.7"
   }
 }

@@ -1,0 +1,52 @@
+---
+interface Props {
+	title: string;
+	tone?: 'thesis' | 'note' | 'risk';
+}
+
+const { title, tone = 'note' } = Astro.props;
+---
+
+<aside class:list={['callout', tone]}>
+	<p class="callout-title">{title}</p>
+	<div class="callout-body">
+		<slot />
+	</div>
+</aside>
+
+<style>
+	.callout {
+		margin: 1.75rem 0;
+		padding: 1rem 1.1rem;
+		border: 1px solid oklch(78% 0.035 232);
+		border-radius: 8px;
+		background: oklch(96% 0.012 232);
+	}
+
+	.callout.thesis {
+		border-color: oklch(66% 0.085 212);
+		background: oklch(94% 0.03 212);
+	}
+
+	.callout.risk {
+		border-color: oklch(70% 0.08 52);
+		background: oklch(95% 0.03 70);
+	}
+
+	.callout-title {
+		margin: 0 0 0.45rem;
+		color: oklch(28% 0.08 232);
+		font-size: 0.78rem;
+		font-weight: 760;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	.callout-body :global(p) {
+		margin: 0.55rem 0 0;
+	}
+
+	.callout-body :global(p:first-child) {
+		margin-top: 0;
+	}
+</style>
